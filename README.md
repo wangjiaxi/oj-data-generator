@@ -44,10 +44,10 @@ python3 scripts/release.py patch "修复 xxx" "新增 yyy"
 
 只改了 README 这类文件、不想打扰别人的话，正常 commit 和 push 就行，不用跑 release.py。
 
-同步到 skillhub（可选）：先在终端登录一次 `skillhub login --key skh_你的令牌`，再运行：
+skillhub 同步：在本机登录过 skillhub 的话，release.py 推送完会自动把这一版发到 skillhub，页面上的名称和简介保持不变，不想同步可以加 `--no-skillhub`。skillhub 那边要审核，审核通过后新版本才上架。登录只需要一次，令牌在 skillhub.cn 个人中心 → API keys 里创建：
 
 ```bash
-python3 scripts/publish_skillhub.py
+skillhub login --key skh_你的令牌 --host https://api.skillhub.cn
 ```
 
-它会把当前版本连同 skillhub 页面上的名称、简介一起发上去。
+单独补发某一版到 skillhub：`python3 scripts/publish_skillhub.py`。

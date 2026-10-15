@@ -6,12 +6,14 @@
     python3 scripts/publish_skillhub.py            # 发布 VERSION 对应的 tag
     python3 scripts/publish_skillhub.py --dry-run  # 只做本地预检，不上传
 
-要先登录：skillhub login --key skh_xxx（令牌在 skillhub.cn 网页上生成）
+要先在终端登录一次（令牌在 skillhub.cn 个人中心 → API keys 创建）：
+    skillhub login --key skh_xxx --host https://api.skillhub.cn
 
-做的事：用 git archive 导出 tag v<VERSION> 的文件，在导出的 SKILL.md 头部补上
-skillhub 要的 slug / displayName / summary / homepage，再执行 skillhub publish，
-changelog 取 CHANGELOG.md 里这一版的条目。这些字段不写进仓库里的 SKILL.md，
-免得 claude.ai 上传技能时校验头部字段不通过。
+做的事：核对登录的是作者账号 → 用 git archive 导出 tag v<VERSION> 的文件，在导出的
+SKILL.md 头部补上 skillhub 要的 slug / displayName / summary / homepage → 执行
+skillhub publish，changelog 取 CHANGELOG.md 里这一版的条目。发布后要等 skillhub 审核，
+通过后新版本才上架。这些字段不写进仓库里的 SKILL.md，免得 claude.ai 上传技能时
+校验头部字段不通过。
 """
 
 import argparse
@@ -29,11 +31,24 @@ import check_update as cu
 SLUG = "oj-data-generator"
 DISPLAY_NAME = "OJ测试数据生成"
 HOMEPAGE = "https://github.com/" + cu.REPO
+OWNER_HANDLE = "user_b89a4d0a"  # skillhub 上这个技能的作者账号；换账号发布会变成另一个技能
 
 
 def fail(msg):
     print(f"❌ {msg}")
     sys.exit(1)
+
+
+def check_account(skillhub):
+    """确认本机 skillhub 登录的是作者账号"""
+    r = subprocess.run([skillhub, "--skip-self-upgrade", "auth", "whoami"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        fail("skillhub 没登录，先在终端运行：skillhub login --key skh_xxx --host https://api.skillhub.cn")
+    m = re.search(r"^handle\s*:\s*@?(\S+)", r.stdout, re.M)
+    handle = m.group(1) if m else "未知账号"
+    if handle != OWNER_HANDLE:
+        fail(f"skillhub 登录的是 {handle}，不是这个技能的作者 {OWNER_HANDLE}，已停止发布")
 
 
 def add_skillhub_fields(skill_md):
@@ -56,6 +71,8 @@ def main():
     skillhub = shutil.which("skillhub")
     if not skillhub:
         fail("没装 skillhub 命令行")
+    if not args.dry_run:
+        check_account(skillhub)
     version = cu.read_local_version(cu.SKILL_DIR)
     if not version:
         fail("VERSION 文件缺失或格式不对")
@@ -82,6 +99,8 @@ def main():
             cmd.append("--dry-run")
         print(f"▶ {'预检' if args.dry_run else '发布'} {SLUG}@{version} 到 skillhub", flush=True)
         code = subprocess.run(cmd).returncode
+    if code == 0 and not args.dry_run:
+        print("已提交 skillhub，审核通过后新版本才上架（个人中心 → 我的 Skill 可看状态）")
     sys.exit(code)
 
 

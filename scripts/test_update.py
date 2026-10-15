@@ -11,7 +11,7 @@
 5. 普通目录安装：下载压缩包整体替换，旧版进备份
 6. git 安装：git pull 更新；有本地改动时停下不覆盖
 7. release.py：改 VERSION / CHANGELOG、提交、打 tag、推送
-8. publish_skillhub.py：给导出的 SKILL.md 补上 skillhub 要的字段，正文不变
+8. publish_skillhub.py：给导出的 SKILL.md 补上 skillhub 要的字段、正文不变；不是作者账号时停下
 
 运行：
     python3 scripts/test_update.py
@@ -220,6 +220,7 @@ def main():
                             "patch", "测试发布条目", "--skip-tests"],
                            cwd=clone, capture_output=True, text=True)
         assert r.returncode == 0, r.stdout + r.stderr
+        assert "skillhub" not in r.stdout, "推到非正式仓库时不应同步 skillhub"
         assert sh(["git", "--git-dir", bare, "show", "main:VERSION"]).strip() == "1.0.3"
         assert "v1.0.3" in sh(["git", "--git-dir", bare, "tag"]).split()
         changelog = sh(["git", "--git-dir", bare, "show", "main:CHANGELOG.md"])
@@ -240,7 +241,19 @@ def main():
         assert fields["summary"] == fields["description"] and fields["homepage"].endswith(cu.REPO), fields
         assert fields["name"] == "oj-data-generator", fields
         assert body == original.split("\n---\n", 1)[1], "正文不应改动"
-        print("✅ 用例8：publish_skillhub.py 补 skillhub 字段通过")
+
+        # 登录的不是作者账号时停下（用假的 skillhub 命令模拟 whoami 输出）
+        fake = root / "fake-skillhub"
+        for handle, should_pass in ((publish_skillhub.OWNER_HANDLE, True), ("someone_else", False)):
+            fake.write_text(f"#!/bin/sh\necho 'userId : 1'\necho 'handle : {handle}'\n", encoding="utf-8")
+            fake.chmod(0o755)
+            try:
+                quiet(publish_skillhub.check_account, str(fake))
+                passed = True
+            except SystemExit:
+                passed = False
+            assert passed == should_pass, f"handle={handle} 时账号核对结果不对"
+        print("✅ 用例8：publish_skillhub.py 补 skillhub 字段、核对作者账号通过")
 
     print("\n🎉 更新相关测试全部通过")
 
