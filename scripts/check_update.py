@@ -114,39 +114,28 @@ def fetch(url, timeout=TIMEOUT, max_bytes=1024 * 1024):
     return r.stdout if r.returncode == 0 and len(r.stdout) <= max_bytes else None
 
 
-def fetch_all(urls, timeout=TIMEOUT):
-    """并发 GET，总共最多等 timeout+1 秒，返回与 urls 一一对应的结果（失败为 None）。
+def fetch_remote(timeout=TIMEOUT, raw_urls=None):
+    """取 VERSION 和 CHANGELOG.md，返回 (最新版本号, CHANGELOG 文本)；全部失败时返回 (None, "")。
+    各来源同时请求、按顺序采用：GitHub 一拿到就返回，镜像只会更旧，GitHub 连不上时才用。
     用守护线程而不是线程池：DNS 卡住时进程照样能立刻退出"""
+    raw_urls = raw_urls or RAW_URLS
+    urls = [u.format(path=p) for u in raw_urls for p in ("VERSION", "CHANGELOG.md")]
     results = [None] * len(urls)
 
-    def worker(i, url):
-        results[i] = fetch(url, timeout)
+    def worker(i):
+        results[i] = fetch(urls[i], timeout)
 
-    threads = [threading.Thread(target=worker, args=(i, u), daemon=True)
-               for i, u in enumerate(urls)]
+    threads = [threading.Thread(target=worker, args=(i,), daemon=True) for i in range(len(urls))]
     for t in threads:
         t.start()
     deadline = time.monotonic() + timeout + 1
-    for t in threads:
-        t.join(max(0.0, deadline - time.monotonic()))
-    return list(results)
-
-
-def fetch_remote(timeout=TIMEOUT, raw_urls=None):
-    """读各来源的 VERSION 和 CHANGELOG.md，返回 (最新版本号, CHANGELOG 文本)。
-    取各来源里最大的版本号（镜像可能落后）；全部失败时返回 (None, "")"""
-    raw_urls = raw_urls or RAW_URLS
-    urls = [u.format(path=p) for u in raw_urls for p in ("VERSION", "CHANGELOG.md")]
-    texts = [b.decode("utf-8", "replace") if b else "" for b in fetch_all(urls, timeout)]
-    versions = [t.strip() for t in texts[0::2] if parse_version(t)]
-    if not versions:
-        return None, ""
-    latest = max(versions, key=parse_version)
-    # 优先用写了这个版本的 CHANGELOG（镜像那份可能还没更新）
-    changelog = next((c for c in texts[1::2]
-                      if any(parse_version(v) == parse_version(latest)
-                             for v in parse_changelog(c))), "")
-    return latest, changelog
+    for i in range(0, len(urls), 2):  # 每个来源两项：VERSION、CHANGELOG.md
+        for t in threads[i:i + 2]:
+            t.join(max(0.0, deadline - time.monotonic()))
+        version = (results[i] or b"").decode("utf-8", "replace").strip()
+        if parse_version(version):
+            return version, (results[i + 1] or b"").decode("utf-8", "replace")
+    return None, ""
 
 
 def cache_file():

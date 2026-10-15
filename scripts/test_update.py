@@ -4,7 +4,8 @@
 
 覆盖场景：
 1. 版本号比较、CHANGELOG 解析
-2. 有新版时提示版本号、更新内容和更新命令；已是最新、连不上、关闭检查时不输出
+2. 有新版时提示版本号、更新内容和更新命令；GitHub 连不上时用镜像；
+   已是最新、都连不上、关闭检查时不输出
 3. 缓存：1 小时内不重复联网，过期后重新检查，连不上时沿用上次结果
 4. generate_data.py 运行时打印新版提示（不依赖 cyaron）
 5. 普通目录安装：下载压缩包整体替换，旧版进备份
@@ -123,7 +124,10 @@ def main():
         os.environ[cu.OPT_OUT_ENV] = "1"
         assert cu.get_notice(skill_dir=user, raw_urls=raw) is None, "关闭检查后不应提示"
         del os.environ[cu.OPT_OUT_ENV]
-        print("✅ 用例2：有新版才提示，已是最新 / 连不上 / 关闭检查时不输出通过")
+
+        notice = cu.get_notice(force=True, skill_dir=user, raw_urls=dead + raw)
+        assert notice and "1.0.0 → 1.1.0" in notice and "新功能乙" in notice, "第一个来源连不上时应改用后面的镜像"
+        print("✅ 用例2：有新版才提示、镜像兜底，已是最新 / 连不上 / 关闭检查时不输出通过")
 
         # 3. 缓存：期内不联网，过期重新检查，连不上沿用上次结果
         assert "→ 1.1.0" in cu.get_notice(skill_dir=user, raw_urls=raw)
