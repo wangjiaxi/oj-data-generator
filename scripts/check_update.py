@@ -53,12 +53,22 @@ def parse_version(text):
 
 
 def read_local_version(skill_dir=SKILL_DIR):
-    """读技能目录下的 VERSION，缺失或格式不对返回 None"""
+    """读技能目录下的 VERSION；从 skillhub 装的没有 VERSION（skillhub 不收没扩展名的文件），
+    改读 SKILL.md 头部的 version。都没有或格式不对返回 None"""
     try:
         text = (Path(skill_dir) / "VERSION").read_text(encoding="utf-8").strip()
     except OSError:
-        return None
+        text = _frontmatter_version(Path(skill_dir) / "SKILL.md")
     return text if parse_version(text) else None
+
+
+def _frontmatter_version(skill_md):
+    try:
+        m = re.match(r"---\n(.*?)\n---\n", skill_md.read_text(encoding="utf-8"), re.S)
+    except OSError:
+        return None
+    version = re.search(r"^version:\s*['\"]?([^'\"\s]+)", m.group(1), re.M) if m else None
+    return version.group(1) if version else None
 
 
 def parse_changelog(text):

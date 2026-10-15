@@ -11,7 +11,7 @@
 5. 普通目录安装：下载压缩包整体替换，旧版进备份
 6. git 安装：git pull 更新；有本地改动时停下不覆盖
 7. release.py：改 VERSION / CHANGELOG、提交、打 tag、推送
-8. publish_skillhub.py：给导出的 SKILL.md 补上 skillhub 要的字段、正文不变；不是作者账号时停下
+8. publish_skillhub.py：发布包去掉 VERSION、SKILL.md 头部补 skillhub 字段；changelog 范围；不是作者账号时停下
 
 运行：
     python3 scripts/test_update.py
@@ -228,19 +228,27 @@ def main():
         assert newest.startswith("1.0.3 - ") and "- 测试发布条目" in newest, changelog
         print("✅ 用例7：release.py 改版本号、写 CHANGELOG、提交、打 tag、推送通过")
 
-        # 8. publish_skillhub.py：给导出的 SKILL.md 补上 skillhub 要的字段，正文不变
+        # 8. publish_skillhub.py：发布包去掉 VERSION，SKILL.md 头部补上 skillhub 字段、正文不变，
+        #    没有 VERSION 时版本检查改读 SKILL.md 头部
         import publish_skillhub
-        original = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
-        md = root / "SKILL.md"
-        md.write_text(original, encoding="utf-8")
-        publish_skillhub.add_skillhub_fields(md)
-        head, body = md.read_text(encoding="utf-8").split("\n---\n", 1)
+        pkg = copy_skill(root / "pkg" / "oj-data-generator", "1.0.3")
+        original = (pkg / "SKILL.md").read_text(encoding="utf-8")
+        publish_skillhub.prepare_package(pkg, "1.0.3")
+        assert not (pkg / "VERSION").exists(), "skillhub 包里不应有 VERSION"
+        assert cu.read_local_version(pkg) == "1.0.3", "没有 VERSION 时应从 SKILL.md 头部读版本号"
+        head, body = (pkg / "SKILL.md").read_text(encoding="utf-8").split("\n---\n", 1)
         fields = dict((k.strip(), v.strip()) for k, v in
                       (line.split(":", 1) for line in head.splitlines()[1:] if ":" in line))
         assert fields["slug"] == "oj-data-generator" and fields["displayName"] == "OJ测试数据生成", fields
+        assert fields["version"] == "1.0.3" and fields["name"] == "oj-data-generator", fields
         assert fields["summary"] == fields["description"] and fields["homepage"].endswith(cu.REPO), fields
-        assert fields["name"] == "oj-data-generator", fields
         assert body == original.split("\n---\n", 1)[1], "正文不应改动"
+
+        # skillhub 的 changelog 写上架版本之后的全部条目；查不到上架版本时只写这一版
+        publish_skillhub.published_version = lambda: "1.0.0"
+        assert publish_skillhub.changelog_since_published(CHANGELOG, "1.1.0") == ["[1.1.0] 新功能乙", "[1.0.1] 修复甲"]
+        publish_skillhub.published_version = lambda: None
+        assert publish_skillhub.changelog_since_published(CHANGELOG, "1.1.0") == ["新功能乙"]
 
         # 登录的不是作者账号时停下（用假的 skillhub 命令模拟 whoami 输出）
         fake = root / "fake-skillhub"
@@ -253,7 +261,7 @@ def main():
             except SystemExit:
                 passed = False
             assert passed == should_pass, f"handle={handle} 时账号核对结果不对"
-        print("✅ 用例8：publish_skillhub.py 补 skillhub 字段、核对作者账号通过")
+        print("✅ 用例8：publish_skillhub.py 发布包处理、changelog 范围、核对作者账号通过")
 
     print("\n🎉 更新相关测试全部通过")
 

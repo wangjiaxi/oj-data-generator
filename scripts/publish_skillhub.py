@@ -10,14 +10,15 @@
     skillhub login --key skh_xxx --host https://api.skillhub.cn
 
 做的事：核对登录的是作者账号 → 用 git archive 导出 tag v<VERSION> 的文件，在导出的
-SKILL.md 头部补上 skillhub 要的 slug / displayName / summary / homepage → 执行
-skillhub publish，changelog 取 CHANGELOG.md 里这一版的条目。发布后要等 skillhub 审核，
-通过后新版本才上架。这些字段不写进仓库里的 SKILL.md，免得 claude.ai 上传技能时
-校验头部字段不通过。
+SKILL.md 头部补上 skillhub 要的 slug / displayName / version / summary / homepage，
+去掉 VERSION（skillhub 不收没扩展名的文件）→ 执行 skillhub publish，changelog 取
+skillhub 上架版本之后的全部条目。发布后要等 skillhub 审核，通过后新版本才上架。
+这些字段不写进仓库里的 SKILL.md，免得 claude.ai 上传技能时校验头部字段不通过。
 """
 
 import argparse
 import io
+import json
 import re
 import shutil
 import subprocess
@@ -51,16 +52,42 @@ def check_account(skillhub):
         fail(f"skillhub 登录的是 {handle}，不是这个技能的作者 {OWNER_HANDLE}，已停止发布")
 
 
-def add_skillhub_fields(skill_md):
+def add_skillhub_fields(skill_md, version):
     """在 SKILL.md 头部补上 skillhub 要的字段；summary 沿用 description（skillhub 页面上的简介）"""
     text = skill_md.read_text(encoding="utf-8")
     m = re.match(r"---\n(.*?)\n---\n", text, re.S)
     desc = re.search(r"^description:\s*(.+)$", m.group(1), re.M) if m else None
     if not desc:
         fail("SKILL.md 头部格式不对或缺 description")
-    extra = (f"slug: {SLUG}\ndisplayName: {DISPLAY_NAME}\n"
+    extra = (f"slug: {SLUG}\ndisplayName: {DISPLAY_NAME}\nversion: {version}\n"
              f"summary: {desc.group(1).strip()}\nhomepage: {HOMEPAGE}")
     skill_md.write_text(f"---\n{m.group(1)}\n{extra}\n---\n" + text[m.end():], encoding="utf-8")
+
+
+def prepare_package(dest, version):
+    """把从 tag 导出的目录改成 skillhub 收的样子：skillhub 不收没扩展名的文件，
+    去掉 VERSION，版本号写进 SKILL.md 头部（check_update.py 找不到 VERSION 时读它）"""
+    for name in (".gitignore", "VERSION"):
+        path = dest / name
+        if path.exists():
+            path.unlink()
+    add_skillhub_fields(dest / "SKILL.md", version)
+
+
+def published_version():
+    """skillhub 上当前上架的版本号，取不到返回 None"""
+    data = cu.fetch(f"https://api.skillhub.cn/api/v1/skills/{SLUG}?namespace={OWNER_HANDLE}", timeout=10)
+    try:
+        return json.loads(data)["latestVersion"]["version"] if data else None
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
+def changelog_since_published(changelog, version):
+    """skillhub 用户可能跨几个版本升级，changelog 写上架版本之后的全部条目"""
+    since = published_version()
+    notes = cu.notes_between(changelog, since, version, limit=50) if since else []
+    return notes or cu.parse_changelog(changelog).get(version, [])
 
 
 def main():
@@ -86,12 +113,9 @@ def main():
         dest = Path(tmp) / SLUG
         with zipfile.ZipFile(io.BytesIO(archive.stdout)) as zf:
             zf.extractall(dest)
-        gitignore = dest / ".gitignore"
-        if gitignore.exists():
-            gitignore.unlink()
-        add_skillhub_fields(dest / "SKILL.md")
+        prepare_package(dest, version)
         changelog_md = dest / "CHANGELOG.md"
-        notes = cu.parse_changelog(changelog_md.read_text(encoding="utf-8")).get(version, []) \
+        notes = changelog_since_published(changelog_md.read_text(encoding="utf-8"), version) \
             if changelog_md.exists() else []
         cmd = [skillhub, "--skip-self-upgrade", "publish", str(dest), "--version", version,
                "--changelog", "；".join(notes) or f"v{version}"]
