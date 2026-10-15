@@ -352,6 +352,15 @@ def show_summary(output_dir, count):
         print(f"   {f.name:>10s}  {size_kb:>8.1f} KB")
 
 
+def update_notice():
+    """有新版本时返回提示文字；检查脚本缺失时返回 None（检查本身不会抛异常）"""
+    try:
+        from check_update import get_notice
+    except ImportError:
+        return None
+    return get_notice()
+
+
 def main():
     args = parse_args()
     
@@ -368,6 +377,11 @@ def main():
     print(f"随机种子: {args.seed or '未设置'}")
     print(f"打包 ZIP: {'是（' + args.zip_mode + ' 布局）' if args.zip else '否（默认输出文件夹）'}")
     print(f"输出目录: {output_dir.absolute()}")
+
+    # 有新版本时提示（联网结果缓存 1 小时，连不上就跳过，不影响生成）
+    notice = update_notice()
+    if notice:
+        print(f"\n{notice}")
     
     # 步骤 1: 定位并验证 cyaron 脚本
     cyaron_script = find_cyaron_script(args)

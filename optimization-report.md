@@ -172,3 +172,18 @@ bde5b92  optimize: add 4 user confirmation checkpoints   SKILL.md
 | 不传 `--output-dir`（默认 `./output`）或传相对路径时，gen_data.py 被拼成 `output/output/gen_data.py`，直接报错退出 | `main()` 里把输出目录 `resolve()` 成绝对路径 |
 | `cyaron_guide.md`「设置随机种子」写的 `seed(value)` 在 cyaron 里不存在 | 改为 `random.seed(value)`，并注明 cyaron 没有自己的 seed() |
 | 冒烟测试只用绝对路径，没覆盖 SKILL.md 里的默认调用 | 新增用例6：不传 `--output-dir` 的默认调用（6 个用例全部通过） |
+
+---
+
+### 第9轮：GitHub 仓库 + 新版本提示 🟢
+
+**日期**：2026-10-15（v1.3.0）
+
+| 改动 | 说明 |
+|------|------|
+| 迁到 GitHub 维护 | https://github.com/wangjiaxi/oj-data-generator ，仓库根目录就是技能目录，`git clone` 到 `~/.claude/skills/` 即可用 |
+| 新版本检查 | `scripts/check_update.py` 比较本地 `VERSION` 和 GitHub 上 main 分支的 `VERSION`（jsDelivr 镜像兜底），有新版时提示版本号和 CHANGELOG 里的更新内容；结果缓存 1 小时，连不上静默跳过，`OJ_DATA_GENERATOR_NO_UPDATE_CHECK=1` 可关闭 |
+| 触发时机 | SKILL.md「开始前」先跑检查，提示写进阶段 2 的方案里，不额外打断；`generate_data.py` 每次运行也检查，防止漏提示 |
+| 一键更新 | `scripts/update.py`：git 安装走 `git pull --ff-only`，本地有改动就停下；其他安装方式下载 tag 压缩包整体替换，旧版备份到 `~/.cache/oj-data-generator/backup/` |
+| 发布流程 | `scripts/release.py`：跑测试 → 改 VERSION / CHANGELOG → commit → tag → push → 刷新 jsDelivr 缓存 |
+| 测试 | 新增 `scripts/test_update.py`（7 个离线用例）；`smoke_test.py` 运行时关掉联网检查 |

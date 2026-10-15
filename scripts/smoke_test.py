@@ -69,7 +69,9 @@ print("\\n".join(map(str, arr)))
 
 
 def run(cmd, cwd):
-    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+    # 冒烟测试不联网：关掉 generate_data.py 开头的新版本检查
+    env = dict(os.environ, OJ_DATA_GENERATOR_NO_UPDATE_CHECK="1")
+    return subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True)
 
 
 def main():
