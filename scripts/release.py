@@ -106,6 +106,7 @@ def main():
         for path in ("VERSION", "CHANGELOG.md"):
             cu.fetch(f"https://purge.jsdelivr.net/gh/{cu.REPO}@{cu.BRANCH}/{path}", timeout=10)
     print(f"\n✅ 已发布 v{new}：其他人最迟约 1 小时内使用技能时会收到新版提示")
+    print("   同步到 skillhub：python3 scripts/publish_skillhub.py（需先 skillhub login）")
 
 
 if __name__ == "__main__":

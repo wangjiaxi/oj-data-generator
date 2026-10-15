@@ -43,3 +43,11 @@ python3 scripts/release.py patch "修复 xxx" "新增 yyy"
 脚本会依次跑测试、改 VERSION 和 CHANGELOG.md、提交、打 tag、推送。推送后，其他人最迟约 1 小时内使用技能时就会看到提示。
 
 只改了 README 这类文件、不想打扰别人的话，正常 commit 和 push 就行，不用跑 release.py。
+
+同步到 skillhub（可选）：先在终端登录一次 `skillhub login --key skh_你的令牌`，再运行：
+
+```bash
+python3 scripts/publish_skillhub.py
+```
+
+它会把当前版本连同 skillhub 页面上的名称、简介一起发上去。

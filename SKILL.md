@@ -183,6 +183,7 @@ oj-data-generator/
 │   ├── check_update.py            # 检查新版本（有新版才输出）
 │   ├── update.py                  # 更新到最新版
 │   ├── release.py                 # 维护者发布新版本
+│   ├── publish_skillhub.py        # 维护者把当前版本同步到 skillhub
 │   ├── smoke_test.py              # 生成流程冒烟测试
 │   └── test_update.py             # 版本检查 / 更新 / 发布的离线测试
 ├── references/
