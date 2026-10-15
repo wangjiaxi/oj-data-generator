@@ -73,6 +73,7 @@ def main():
     parser.add_argument("--skip-tests", action="store_true", help="不跑测试（不建议）")
     parser.add_argument("--no-skillhub", action="store_true", help="不同步发布到 skillhub")
     args = parser.parse_args()
+    sys.stdout.reconfigure(line_buffering=True)  # 和子进程（测试、git push）的输出按顺序交替
 
     current = cu.read_local_version(SKILL_DIR)
     if not current:
