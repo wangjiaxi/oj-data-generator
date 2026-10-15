@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.DS_Store
+# skillhub 安装时生成的元数据
+_meta.json
+# 在技能目录里直接跑生成时的产物
+output/
+*_compiled
